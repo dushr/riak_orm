@@ -7,5 +7,8 @@ class RiakModelBaseError(Exception):
 class RiakModelMissingManager(RiakModelBaseError):
     pass
 
+class DoesNotExistError(RiakModelBaseError):
+    pass
+
 
 riak_client = riak.RiakClient(host='10.177.0.81')
