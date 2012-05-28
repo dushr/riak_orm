@@ -13,4 +13,9 @@ class RiakManager(object):
         self.model.bucket_name = name.lower()
 
 
+
+
+
+
+
     

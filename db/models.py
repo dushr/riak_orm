@@ -14,22 +14,26 @@ class ModelMeta(type):
         # This will still be accessible at a class level
         attr_dict['base_fields'] = field_dict 
 
-
         print attr_dict
         print name
         print cls
+        print bases
+
+        model_class = super(ModelMeta, cls).__new__(cls, name, bases, attr_dict)
+        print model_class
 
         # Initialise the manager to hook into this class (for now the manager
         # must be called 'objects')
-        try:
-            manager = attr_dict['objects']
-        except KeyError, e:
-            raise RiakModelMissingManager('Your model must have an objects manager')
-        else:
-            if not isinstance(manager, RiakManager):
-                raise RiakModelMissingManager('Objects is not a manager')
-            # Make the manager use this class
-            manager.set_model(cls, name)
+        if name not in ('RiakBaseModel', 'RiakModel'):
+            try:
+                manager = attr_dict['objects']
+            except KeyError, e:
+                raise RiakModelMissingManager('Your model must have an objects manager')
+            else:
+                if not isinstance(manager, RiakManager):
+                    raise RiakModelMissingManager('Objects is not a manager')
+                # Make the manager use this class
+                manager.set_model(model_class, name)
 
         return super(ModelMeta, cls).__new__(cls, name, bases, attr_dict)
 
