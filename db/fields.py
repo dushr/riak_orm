@@ -1,6 +1,8 @@
-
-
 class RiakBaseField(object):
+    '''
+    The base for all Riak fields. It simply allows each field to have a value
+    and can determine if it is allowed to be empty or not.
+    '''
     
     def __init__(self, required=True, *args, **kwargs):
         self.value = None
@@ -35,6 +37,3 @@ class RiakListField(RiakField):
             raise TypeError('Should be a list or a tuple')
 
         super(RiakListField, self).is_valid(self)
-
-
-

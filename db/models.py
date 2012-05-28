@@ -14,13 +14,7 @@ class ModelMeta(type):
         # This will still be accessible at a class level
         attr_dict['base_fields'] = field_dict 
 
-        print attr_dict
-        print name
-        print cls
-        print bases
-
         model_class = super(ModelMeta, cls).__new__(cls, name, bases, attr_dict)
-        print model_class
 
         # Initialise the manager to hook into this class (for now the manager
         # must be called 'objects')
@@ -42,25 +36,50 @@ class RiakBaseModel(object):
     __metaclass__ = ModelMeta
 
     def __init__(self, *args, **kwargs):
+        '''
+        Gives each instance a copy of the fields defined at a class level and
+        sets their internal values to those provided in kwargs/
+        '''
+        # Note that only base_fields remains at the class level
         self.fields = copy.deepcopy(self.base_fields)
         for k,v in self.fields.iteritems():
+            # We do not force values to be available for fields right away
             v.value = kwargs.get(k, None)
-            setattr(self, k, v.value)
 
     def __iter__(self):
+        '''
+        When looping, creates generator of fields
+        '''
         for name in self.fields:
             yield self[name]
 
     def __getitem__(self, name):
-        
+        '''
+        Allows key indexing 
+        '''
         return self.fields[name]
 
-    def __setattr__(self, name, value):
-        
-        if name in getattr(self, 'fields', ()):
-            self.fields[name].value = value
+    def __getattr__(self, name):
+        '''
+        If name does not exist in class, check the fields we have stored.
+        '''
+        try:
+            return self.fields[name].value
+        except KeyError:
+            raise AttributeError('%s has not attribute %s' % (self.__class__.__name__,
+                                                              name))
 
-        super(RiakBaseModel, self).__setattr__(name, value)
+    def __setattr__(self, name, value):
+        '''
+        Sets values inside fields if name is a known field name.
+        '''
+        try:
+            # Must use __dict__ explicitly in setattr!
+            field = self.__dict__['fields'][name]
+        except KeyError, e:
+            super(RiakBaseModel, self).__setattr__(name, value)
+        else:
+            field.value = value
 
     def save(self, *args, **kwargs):
         '''
@@ -86,19 +105,29 @@ class RiakModel(RiakBaseModel):
         with open(RiakModel.bucket_name, 'a') as f:
             f.write('%s:%s\n' % (self.key, self.values))
 
-        pass
-
     def validate_fields(self, *args, **kwargs):
+        '''
+        Iterates over every field and ensures that if it is required that it
+        has a legit value.
+        '''
         for name, field in self.fields.iteritems():
             if not field.is_valid():
                 raise AttributeError('%s field is required' % name)
 
     def generate_key(self, *args, **kwargs):
+        '''
+        Uses the key separator and and key order names to construct a key in
+        the desired format.
+        '''
         key_list = [str(self[attr].value) for attr in self.key_order if self[attr].in_key]
         self.key = self.key_seperator.join(key_list)
         return self.key
 
     def generate_values(self, *args, **kwargs):
+        '''
+        The dictionary that will be passed as a json like object in the
+        key-value store.
+        '''
         key_dict = dict([(name, field.value) for name, field in self.fields.iteritems() if field.in_value])
         self.values = key_dict
         return self.values
