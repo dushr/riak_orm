@@ -30,7 +30,7 @@ class ModelMeta(type):
                 # Make the manager use this class
                 manager.set_model(model_class, name)
 
-        return super(ModelMeta, cls).__new__(cls, name, bases, attr_dict)
+        return model_class
 
 class RiakBaseModel(object):
 

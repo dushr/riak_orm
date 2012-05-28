@@ -8,4 +8,4 @@ class RiakModelMissingManager(RiakModelBaseError):
     pass
 
 
-riak_client = riak.Client(host='10.177.0.81')
+riak_client = riak.RiakClient(host='10.177.0.81')
