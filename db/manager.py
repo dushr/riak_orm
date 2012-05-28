@@ -1,3 +1,5 @@
+from db import riak_client
+
 class RiakManager(object):
     def __init__(self):
         self.model = None
@@ -12,8 +14,10 @@ class RiakManager(object):
         # For now, we simply use the name of the class lower cased
         self.model.bucket_name = name.lower()
 
-
-
+    def get(self, key):
+        bucket = riak_client.bucket(self.model.bucket_name)
+        result = bucket.get(key)
+        return self.model(**result.get_data())
 
 
 
