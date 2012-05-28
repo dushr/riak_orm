@@ -1,25 +1,44 @@
 from db.fields import RiakField
+from db.manager import RiakManager
+from db import RiakModelMissingManager
 import copy
-import riak
+# import riak
 
-class DerivedRiakFieldInitiator(type):
+class ModelMeta(type):
 
     def __new__(cls, name, bases, attr_dict):
+        # Create a dict of all riak fields for deepcopy later 
+        # This turns later allows these class attributes to be converted into
+        # instance attributes
         field_dict = dict([(k, attr_dict.pop(k)) for k, v in attr_dict.items() if isinstance(v, RiakField)])
+        # This will still be accessible at a class level
         attr_dict['base_fields'] = field_dict 
 
-        return super(DerivedRiakFieldInitiator, cls).__new__(cls, name, bases, attr_dict)
 
+        print attr_dict
+        print name
+        print cls
 
+        # Initialise the manager to hook into this class (for now the manager
+        # must be called 'objects')
+        try:
+            manager = attr_dict['objects']
+        except KeyError, e:
+            raise RiakModelMissingManager('Your model must have an objects manager')
+        else:
+            if not isinstance(manager, RiakManager):
+                raise RiakModelMissingManager('Objects is not a manager')
+            # Make the manager use this class
+            manager.set_model(cls, name)
+
+        return super(ModelMeta, cls).__new__(cls, name, bases, attr_dict)
 
 class RiakBaseModel(object):
 
-    __metaclass__ = DerivedRiakFieldInitiator
-
+    __metaclass__ = ModelMeta
 
     def __init__(self, *args, **kwargs):
         self.fields = copy.deepcopy(self.base_fields)
-        self.bucket = self.__class__.__name__.lower()
         for k,v in self.fields.iteritems():
             v.value = kwargs.get(k, None)
             setattr(self, k, v.value)
@@ -39,8 +58,6 @@ class RiakBaseModel(object):
 
         super(RiakBaseModel, self).__setattr__(name, value)
 
-            
-
     def save(self, *args, **kwargs):
         '''
         saves a datapoint in riak
@@ -53,11 +70,7 @@ class RiakBaseModel(object):
         '''
         raise NotImplementedError
 
-
-
 class RiakModel(RiakBaseModel):
-
-    # objects = RiakObjectManager(bucket)
 
     def save(self, *args, **kwargs):
         '''
@@ -66,7 +79,7 @@ class RiakModel(RiakBaseModel):
         self.validate_fields()
         self.generate_key()
         self.generate_values()
-        with open(self.bucket, 'a') as f:
+        with open(RiakModel.bucket_name, 'a') as f:
             f.write('%s:%s\n' % (self.key, self.values))
 
         pass
@@ -86,13 +99,4 @@ class RiakModel(RiakBaseModel):
         self.values = key_dict
         return self.values
 
-
-
-class RiakObjectManager(object):
-
-    def __init__(self, bucket):
-        self.bucket = bucket
-
-    def filter(self, *args, **kwargs):
-        pass
 
