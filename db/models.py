@@ -2,6 +2,7 @@ from db.fields import RiakField
 from db.manager import RiakManager
 from db import RiakModelMissingManager
 import copy
+from db import riak_client
 # import riak
 
 class ModelMeta(type):
@@ -100,10 +101,20 @@ class RiakModel(RiakBaseModel):
         saves a datapoint in riak
         '''
         self.validate_fields()
-        self.generate_key()
-        self.generate_values()
-        with open(RiakModel.bucket_name, 'a') as f:
-            f.write('%s:%s\n' % (self.key, self.values))
+        key = self.generate_key()
+        data = self.generate_values()
+        bucket_name = self.bucket_name
+
+        #Innitializing the client and the bucket name
+        client = riak_client
+        bucket = client.bucket(bucket_name)
+
+        #Creating the bucket
+        entry = bucket.new(key, data=data)
+        #Saving it
+        entry.store()
+
+        
 
     def validate_fields(self, *args, **kwargs):
         '''
