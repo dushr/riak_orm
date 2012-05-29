@@ -2,31 +2,13 @@ from db import riak_client
 from db import DoesNotExistError
 from riak import key_filter
 
-class RiakManager(object):
-    def __init__(self):
-        self.model = None
 
-    def set_model(self, model_cls, name):
-        '''
-        This method is called in ModelMeta and sets the manager to be used for
-        the given model. It also sets the a class variable for the bucket name
-        based on the model name
-        '''
-        self.model = model_cls
-        # For now, we simply use the name of the class lower cased
-        self.model.bucket_name = name.lower()
 
-    def get(self, key):
-        '''
-        This method gets the key from riak 
-        '''
-        bucket = riak_client.bucket(self.model.bucket_name)
-        result = bucket.get(key)
-        try:
-            return self.model(**result.get_data())
-        except:
-            raise DoesNotExistError('%s Does not exist in %s model' % (key, 
-                                                                       self.model.__class__.__name__))
+class RiakFilter(object):
+
+    def __init__(self, model, *args, **kwargs):
+        self.model = model
+
 
 
     def filter(self, **kwargs):
@@ -96,6 +78,51 @@ class RiakManager(object):
             raise ValueError('Range Filter takes only two values')
         final = tokenize_filter + key_filter.between(values[0], values[1])
         return final
+
+
+    def __call__(self, *args, **kwargs):
+        return self.filter(*args, **kwargs)
+
+    def count(self, *args, **kwargs):
+        return len(self.filter(*args, **kwargs))
+
+
+
+class RiakManager(object):
+    def __init__(self):
+        self.model = None
+        
+
+    def set_model(self, model_cls, name):
+        '''
+        This method is called in ModelMeta and sets the manager to be used for
+        the given model. It also sets the a class variable for the bucket name
+        based on the model name
+        '''
+        self.model = model_cls
+        # For now, we simply use the name of the class lower cased
+        self.model.bucket_name = name.lower()
+        #oh and set the filter class too
+        self.filter = RiakFilter(self.model)
+
+    def get(self, key):
+        '''
+        This method gets the key from riak 
+        '''
+        bucket = riak_client.bucket(self.model.bucket_name)
+        result = bucket.get(key)
+        try:
+            return self.model(**result.get_data())
+        except:
+            raise DoesNotExistError('%s Does not exist in %s model' % (key, 
+                                                                       self.model.__class__.__name__))
+
+    
+
+
+
+
+
 
 
 
