@@ -2,6 +2,7 @@ from db import riak_client
 from db import DoesNotExistError
 from riak import key_filter
 from hashlib import md5, sha1
+import base64
 
 class RiakManager(object):
     def __init__(self):

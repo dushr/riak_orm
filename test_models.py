@@ -1,5 +1,6 @@
 from db.manager import RiakManager
 from db.fields import RiakField
+from db.models import RiakModel
 
 
 
@@ -29,7 +30,7 @@ class MaterializedModel(RiakModel):
 
 
 class NewDataMaterialized(MaterializedModel):
-    pass
+    objects = RiakManager()
 
 
 class NewDataModel(RiakModel):
