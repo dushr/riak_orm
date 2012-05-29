@@ -18,18 +18,13 @@ class TestDataModel(RiakModel):
     objects = RiakManager()
 
 
-class MaterializedModel(RiakModel):
-    key = RiakModel()
-    base64key = RiakModel(in_key=False, required=False)
-    value = RiakModel(in_key=False)
+class NewDataMaterialized(RiakModel):
+    key = RiakField()
+    base64key = RiakField(in_key=False, required=False)
+    value = RiakField(in_key=False)
 
-    key_order = ('key')
+    key_order = ('key',)
     key_seperator = ':'
-
-    objects = RiakManager()
-
-
-class NewDataMaterialized(MaterializedModel):
     objects = RiakManager()
 
 

@@ -58,7 +58,6 @@ class RiakManager(object):
         all_filters = _list_of_range_filters + _list_of_orfilters
 
         filters = self._make_andfilters(all_filters)
-        print filters
         query = riak_client.add(self.model.bucket_name)
         query.add_key_filters(filters)
         _data = query.run(timeout=10000)

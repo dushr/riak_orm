@@ -10,7 +10,8 @@ class RiakBaseField(object):
 
 
     def is_valid(self):
-        if self.required and not self.value:
+        #Have to check for None here as a value can be 0, or empty dict
+        if self.required and self.value == None:
             return False
         return True
 
