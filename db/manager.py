@@ -101,12 +101,11 @@ class RiakManager(object):
 
     def count(self, generate=False, **kwargs):
         materialized = getattr(self.model, 'materialized', None)
-        generate = kwargs.pop('generate', False)
         if materialized:
             hashed_keys = self._get_query_hash(**kwargs)
             try:
                 count = materialized.objects.get(hashed_keys.hash).value
-            except:
+            except DoesNotExistError:
                 generate = True
             if generate:
                 ## Materialized doesn't exist
