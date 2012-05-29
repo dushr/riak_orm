@@ -105,14 +105,14 @@ class RiakManager(object):
         if materialized:
             hashed_keys = self._get_query_hash(**kwargs)
             try:
-                return materialized.objects.get(hashed_keys['hash']).value
+                return materialized.objects.get(hashed_keys.hash).value
             except:
                 ## Materialized doesn't exist
                 ## get the count from the filter
                 count = len(self.filter(**kwargs))
                 ## save it in the materialized model
-                key = hashed_keys['hash']
-                base64key = hashed_keys['base64_hash']
+                key = hashed_keys.hash
+                base64key = hashed_keys.base64_hash
                 m = materialized(key=key, base64key=base64key, value=count)
                 m.save()
         else:
