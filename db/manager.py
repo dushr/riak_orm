@@ -34,17 +34,28 @@ class RiakManager(object):
         This is method uses the key filter property of 
         riak returns the raw data from riak.
         '''
-        if not set(kwargs).issubset(set(self.model.key_order)):
+        filter_set = [filt.split('__')[0] for filt in kwargs.iterkeys()]
+        if not set(filter_set).issubset(set(self.model.key_order)):
             raise ValueError('Invalid Filter query')
             ## it would be cool if we could tell which field didnt match
             ## TODO
 
-        or_filters = dict([(k, kwargs[k]) for k in kwargs.iterkeys()])
+        #the or filter is assumed to be the field name, so we split it 
+        #accross our identifier '__' and add to the or_filter 
+        or_filters = dict([(k, kwargs.pop(k)) for k,v in kwargs.items() if k.find('__') == -1])
         _list_of_orfilters = []
         for or_filter in or_filters.iteritems():
             _list_of_orfilters.append(self._make_orfilter(or_filter[0], or_filter[1]))
 
-        filters = self._make_andfilters(_list_of_orfilters)
+        ## Now we will only have filters which are attr based
+        range_filters = dict([(k.split('__')[0], kwargs.pop(k)) for k,v in kwargs.items() if k.split('__')[1] == 'range'])
+        _list_of_range_filters = []
+        for range_filter in range_filters.iteritems():
+            _list_of_range_filters.append(self._make_rangefilter(range_filter[0], range_filter[1]))
+
+        all_filters = _list_of_range_filters + _list_of_orfilters
+
+        filters = self._make_andfilters(all_filters)
         print filters
         query = riak_client.add(self.model.bucket_name)
         query.add_key_filters(filters)
@@ -74,7 +85,18 @@ class RiakManager(object):
                 filters = filters & f
             except:
                 filters = f
-        return filters  
+        return filters
+
+    def _make_rangefilter(self, filter, values):
+
+        seperator = self.model.key_seperator
+        key_index = self.model.key_order.index(filter) + 1
+        tokenize_filter = key_filter.tokenize(seperator, key_index)
+        if not len(values) == 2:
+            raise ValueError('Range Filter takes only two values')
+        final = tokenize_filter + key_filter.between(values[0], values[1])
+        return final
+
 
 
 
