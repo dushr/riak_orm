@@ -3,6 +3,14 @@ from db.manager import RiakManager
 from db.fields import RiakField
 
 
+class NewActiveListingMaterialized(RiakModel):
+    key = RiakField()
+    base64key = RiakField(in_key=False, required=False)
+    value = RiakField(in_key=False)
+
+    key_order = ('key',)
+    key_seperator = ':'
+    objects = RiakManager()
 
 class NewActiveListing(RiakModel):
     
@@ -22,3 +30,5 @@ class NewActiveListing(RiakModel):
     key_seperator = ':'
 
     objects = RiakManager()
+
+    materialized = NewActiveListingMaterialized
