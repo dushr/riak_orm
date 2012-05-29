@@ -48,7 +48,7 @@ class RiakManager(object):
         print filters
         query = riak_client.add(self.model.bucket_name)
         query.add_key_filters(filters)
-        _data = query.map(timeout=10000)
+        _data = query.run(timeout=10000)
         return _data
 
 
