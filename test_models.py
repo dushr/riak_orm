@@ -4,20 +4,6 @@ from db.models import RiakModel
 
 
 
-class TestDataModel(RiakModel):
-    category = RiakField()
-    site = RiakField()
-    language = RiakField()
-    datetime = RiakField()
-    item_id = RiakField(in_key=False, required=False)
-
-    key_order = ('datetime','site','category', 'language')
-    key_seperator = '#'
-
-
-    objects = RiakManager()
-
-
 class NewDataMaterialized(RiakModel):
     key = RiakField()
     base64key = RiakField(in_key=False, required=False)
