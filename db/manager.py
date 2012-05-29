@@ -2,36 +2,61 @@ from db import riak_client
 from db import DoesNotExistError
 from riak import key_filter
 from hashlib import md5, sha1
+from itertools import groupby
 import base64
 
-class RiakManager(object):
+
+class RiakQuerySet(object):
+
+    def __init__(self, model, list_of_objects, list_of_keys=[]):
+        self.queryset = list_of_objects
+        self.model = model
+        self.key_queryset = list_of_keys
+
+    def __iter__(self):
+        for obj in self.queryset:
+            yield obj
+
+    def generate_key_queryset(self):
+        if not self.key_queryset:
+            self.key_queryset = [q.get_key() for q in self.queryset]
+        return self.key_queryset
+
+    def sort_key_queryset(self, by=None):
+        if by:
+            key_order = self.model.key_order
+            if by not in key_order:
+                raise ValueError('%s is not in the Key of the model' %by)
+            group_index = key_order.index(by)
+            seperator = self.model.key_seperator
+            self.generate_key_queryset()
+            sort_key = lambda x: x.split(seperator)[group_index]
+            self.key_queryset = sorted(self.key_queryset, key=sort_key)
+
+        return self.key_queryset
+
+
+    def count(self, group_by=None):
+        if group_by:
+            self.sort_key_queryset(by=group_by)
+            key_order = self.model.key_order
+            group_index = key_order.index(group_by)
+            seperator = self.model.key_seperator
+            sort_key = lambda x: x.split(seperator)[group_index]
+            count_list = [(q,len(list(g))) for q,g in groupby(self.key_queryset, key=sort_key)]
+            return count_list
+        return len(self.generate_key_queryset())
+
+class RiakFilter(object):
+
     def __init__(self):
         self.model = None
+        self.queryset = []
 
-    def set_model(self, model_cls, name):
-        '''
-        This method is called in ModelMeta and sets the manager to be used for
-        the given model. It also sets the a class variable for the bucket name
-        based on the model name
-        '''
+    def set_model(self, model_cls):
         self.model = model_cls
-        # For now, we simply use the name of the class lower cased
-        self.model.bucket_name = name.lower()
 
-    def get(self, key):
-        '''
-        This method gets the key from riak 
-        '''
-        bucket = riak_client.bucket(self.model.bucket_name)
-        result = bucket.get(key)
-        try:
-            return self.model(**result.get_data())
-        except:
-            raise DoesNotExistError('%s Does not exist in %s model' % (key, 
-                                                                       self.model.__class__.__name__))
-
-
-    def filter(self, **kwargs):
+    def _filter(self, **kwargs):
         '''
         This is method uses the key filter property of 
         riak returns the raw data from riak.
@@ -99,30 +124,29 @@ class RiakManager(object):
         return final
 
 
-    def count(self, generate=False, **kwargs):
-        materialized = getattr(self.model, 'materialized', None)
-        if materialized:
-            hashed_keys = self._get_query_hash(**kwargs)
-            try:
-                count = materialized.objects.get(hashed_keys.hash).value
-            except DoesNotExistError:
-                generate = True
-            if generate:
-                ## Materialized doesn't exist
-                ## or generate is
-                ## get the count from the filter
-                count = len(self.filter(**kwargs))
-                ## save it in the materialized model
-                key = hashed_keys.hash
-                base64key = hashed_keys.base64_hash
-                m = materialized(key=key, base64key=base64key, value=count)
-                m.save()
+    # def count(self, generate=False, **kwargs):
+    #     materialized = getattr(self.model, 'materialized', None)
+    #     if materialized:
+    #         hashed_keys = self._get_query_hash(**kwargs)
+    #         try:
+    #             count = materialized.objects.get(hashed_keys.hash).value
+    #         except DoesNotExistError:
+    #             generate = True
+    #         if generate:
+    #             ## Materialized doesn't exist
+    #             ## or generate is
+    #             ## get the count from the filter
+    #             count = len(self.filter(**kwargs))
+    #             ## save it in the materialized model
+    #             key = hashed_keys.hash
+    #             base64key = hashed_keys.base64_hash
+    #             m = materialized(key=key, base64key=base64key, value=count)
+    #             m.save()
 
-        else:
-            count = len(self.filter(**kwargs))
+    #     else:
+    #         count = len(self.filter(**kwargs))
 
-        return count
-
+    #     return count
 
 
     def _get_query_hash(self, hash_type='md5', do_base64 = True,  **kwargs):
@@ -163,6 +187,68 @@ class RiakManager(object):
                 })
         return type('return_dict', (object,), return_dict)
 
+    def generate_materialized(self, list_of_objects, hashed_keys):
+        materialized = getattr(self.model, 'materialized', None)
+        if materialized:
+            m = materialized()
+            m.key = hashed_keys.hash
+            m.base64key = hashed_keys.base64_hash
+            m.value = [q.get_key() for q in list_of_objects]
+            m.save()
+
+    def __call__(self, generate=False, *args, **kwargs):
+        materialized = getattr(self.model, 'materialized', None)
+        if materialized:
+            hashed_keys = self._get_query_hash(**kwargs)
+            try:
+                list_of_keys = materialized.objects.get(hashed_keys.hash).value
+                queryset = RiakQuerySet(self.model, [], list_of_keys=list_of_keys)
+                if not isinstance(list_of_keys, list):
+                    generate = True
+            except DoesNotExistError:
+                generate = True
+            if generate:
+                list_of_objects = self._filter(*args, **kwargs)
+                self.generate_materialized(list_of_objects, hashed_keys)
+            else:
+                return queryset
+        else:
+            list_of_objects = self._filter(*args, **kwargs)
+        
+        return RiakQuerySet(self.model, list_of_objects)
+
+
+
+
+class RiakManager(object):
+    def __init__(self):
+        self.model = None
+        self.filter = RiakFilter()
+
+    def set_model(self, model_cls, name):
+        '''
+        This method is called in ModelMeta and sets the manager to be used for
+        the given model. It also sets the a class variable for the bucket name
+        based on the model name
+        '''
+        self.model = model_cls
+        # For now, we simply use the name of the class lower cased
+        self.model.bucket_name = name.lower()
+        self.filter.set_model(model_cls)
+
+    def get(self, key):
+        '''
+        This method gets the key from riak 
+        '''
+        bucket = riak_client.bucket(self.model.bucket_name)
+        result = bucket.get(key)
+        try:
+            return self.model(**result.get_data())
+        except:
+            raise DoesNotExistError('%s Does not exist in %s model' % (key, 
+                                                                       self.model.__class__.__name__))
+
+    
 
 
 

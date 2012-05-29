@@ -28,3 +28,8 @@ class NewDataModel(RiakModel):
     objects = RiakManager()
 
     materialized = NewDataMaterialized
+
+class New(RiakModel):
+    l = RiakField()
+    m = RiakField()
+    cat = RiakManager()
