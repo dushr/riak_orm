@@ -1,6 +1,7 @@
 from db import riak_client
 from db import DoesNotExistError
 from riak import key_filter
+from hashlib import md5, sha1
 
 class RiakManager(object):
     def __init__(self):
@@ -98,6 +99,65 @@ class RiakManager(object):
         return final
 
 
+    def count(self, **kwargs):
+        materialized = getattr(self.model, 'materialized', None)
+        if materialized:
+            hashed_keys = self._get_query_hash(**kwargs)
+            try:
+                return materialized.objects.get(hashed_keys['hash']).value
+            except:
+                ## Materialized doesn't exist
+                ## get the count from the filter
+                count = len(self.filter(**kwargs))
+                ## save it in the materialized model
+                key = hashed_keys['hash']
+                base64key = hashed_keys['base64_hash']
+                m = materialized(key=key, base64key=base64key, value=count)
+                m.save()
+        else:
+            count = len(self.filter(**kwargs))
+
+        return count
+
+
+
+    def _get_query_hash(self, hash_type='md5', do_base64 = True,  **kwargs):
+        try:
+            hash_type = kwargs.pop('hash_type')
+        except KeyError:
+            hash_type = hash_type
+        try:
+            do_base64 = kwargs.pop('do_base64')
+        except KeyError:
+            do_base64 = do_base64
+
+        query_string = ''
+        for key in sorted(kwargs.iterkeys()):
+            query_string += (':'.join([str(key), str(kwargs[key])]) + '.')
+        valid_hash_types = {
+                        'md5': md5,
+                        'sha1': sha1,
+                    }
+
+        hash_method = valid_hash_types.get(hash_type, None)
+        if not hash_method:
+            raise AttributeError('Not a valid hash type')
+        # TODO: Error handling
+        hash_string = hash_method(query_string).hexdigest()
+
+        if do_base64:
+            # TODO: Error handling
+            base64_hash = base64.b64encode(hash_string)
+
+        return_dict = {
+            'hash': hash_string, 
+        }
+        # TODO: There has to be a better way to do this
+        if base64_hash:
+            return_dict.update({
+                'base64_hash': base64_hash
+                })
+        return type('return_dict', (object,), return_dict)
 
 
 

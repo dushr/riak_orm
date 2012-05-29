@@ -29,6 +29,7 @@ class MaterializedModel(RiakModel):
 
 
 class NewDataMaterialized(MaterializedModel):
+    pass
 
 
 class NewDataModel(RiakModel):
