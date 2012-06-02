@@ -32,7 +32,9 @@ class RiakField(RiakBaseField):
 
 
 class RiakListField(RiakField):
-
+    '''
+    The value of the field must be a list or a tuple.
+    '''
     def is_valid(self):
         if not isinstance(self.value, (list, tuple)):
             raise TypeError('Should be a list or a tuple')
